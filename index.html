@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SO-101 마스터-슬레이브 텔레오퍼레이션</title>
+    <meta name="description" content="LeRobot SO-101 기반 마스터-슬레이브 로봇팔 텔레오퍼레이션 프로젝트 소개 웹사이트">
+    <link rel="preload" href="assets/teleoperation-system.svg" as="image">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="SO-101 Teleoperation">
+        <span class="brand-mark"></span>
+        <span>SO-101 Teleoperation</span>
+      </a>
+      <nav class="nav" aria-label="주요 섹션">
+        <a href="#overview">개요</a>
+        <a href="#system">시스템</a>
+        <a href="#experience">체험</a>
+        <a href="#applications">활용</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">LeRobot SO-101 기반 로봇팔 제어 프로젝트</p>
+          <h1>사람이 움직이면, 다른 로봇팔이 그대로 따라 움직입니다.</h1>
+          <p class="lead">
+            직접 손으로 조작용 로봇팔을 움직이면 대상 로봇팔이 관절 움직임을 실시간으로 복제하는
+            마스터-슬레이브 텔레오퍼레이션 시스템입니다.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#system">작동 원리 보기</a>
+            <a class="button secondary" href="#experience">체험 흐름 보기</a>
+          </div>
+        </div>
+        <figure class="hero-visual">
+          <img src="assets/teleoperation-system.svg" alt="마스터 로봇팔과 슬레이브 로봇팔이 실시간 관절 데이터를 주고받는 장면">
+        </figure>
+      </section>
+
+      <section id="overview" class="section overview">
+        <div class="section-heading">
+          <p class="eyebrow">Project Overview</p>
+          <h2>복잡한 코딩 대신 직관적인 손동작으로 로봇을 제어합니다.</h2>
+        </div>
+        <div class="overview-grid">
+          <article>
+            <span class="metric">01</span>
+            <h3>직접 조작</h3>
+            <p>사용자는 조이스틱이나 코드 입력 없이 마스터 로봇팔을 손으로 움직여 원하는 동작을 만듭니다.</p>
+          </article>
+          <article>
+            <span class="metric">02</span>
+            <h3>실시간 추종</h3>
+            <p>각 관절의 위치 변화가 슬레이브 로봇팔로 전달되어 집기, 이동, 놓기 동작을 즉시 따라 합니다.</p>
+          </article>
+          <article>
+            <span class="metric">03</span>
+            <h3>쉬운 체험</h3>
+            <p>로봇 제어를 어려운 프로그래밍이 아니라 몸으로 이해하는 실습형 인터페이스로 바꿉니다.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="system" class="section system">
+        <div class="section-heading">
+          <p class="eyebrow">System Architecture</p>
+          <h2>마스터의 관절 데이터가 슬레이브의 움직임이 됩니다.</h2>
+        </div>
+        <div class="flow" aria-label="시스템 작동 흐름">
+          <div class="flow-card">
+            <span>1</span>
+            <h3>사용자 입력</h3>
+            <p>사람이 마스터 로봇팔을 원하는 자세로 움직입니다.</p>
+          </div>
+          <div class="flow-line"></div>
+          <div class="flow-card">
+            <span>2</span>
+            <h3>관절값 측정</h3>
+            <p>SO-101의 각 관절 위치와 그리퍼 상태를 읽습니다.</p>
+          </div>
+          <div class="flow-line"></div>
+          <div class="flow-card">
+            <span>3</span>
+            <h3>실시간 전송</h3>
+            <p>측정된 움직임을 제어 신호로 변환해 전달합니다.</p>
+          </div>
+          <div class="flow-line"></div>
+          <div class="flow-card">
+            <span>4</span>
+            <h3>동작 재현</h3>
+            <p>슬레이브 로봇팔이 물체를 집고 옮기는 동작을 수행합니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="experience" class="section experience">
+        <div class="panel-copy">
+          <p class="eyebrow">Hands-on Experience</p>
+          <h2>체험자는 손으로 로봇을 가르치듯 움직입니다.</h2>
+          <p>
+            이 시스템은 로봇 제어의 진입 장벽을 낮추는 데 초점을 맞췄습니다. 사용자는 물체를 집고,
+            옮기고, 원하는 위치에 놓는 과정을 직접 수행하면서 센서 입력, 제어 신호, 로봇 동작의 관계를
+            자연스럽게 이해할 수 있습니다.
+          </p>
+        </div>
+        <div class="demo-board">
+          <div class="telemetry">
+            <div><span>Base</span><strong data-target="72">0</strong></div>
+            <div><span>Shoulder</span><strong data-target="118">0</strong></div>
+            <div><span>Elbow</span><strong data-target="86">0</strong></div>
+            <div><span>Gripper</span><strong data-target="41">0</strong></div>
+          </div>
+          <div class="motion-strip">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+      </section>
+
+      <section id="applications" class="section applications">
+        <div class="section-heading">
+          <p class="eyebrow">Applications</p>
+          <h2>교육을 넘어 실제 로봇 활용 분야로 확장할 수 있습니다.</h2>
+        </div>
+        <div class="app-grid">
+          <article><h3>산업 현장</h3><p>작업자가 위험 구역 밖에서 로봇팔을 직관적으로 원격 조작합니다.</p></article>
+          <article><h3>물류 자동화</h3><p>집기와 분류 동작을 빠르게 시연하고 반복 작업으로 확장합니다.</p></article>
+          <article><h3>재활 보조</h3><p>사용자의 움직임을 로봇 동작으로 연결해 보조 장치 학습에 활용합니다.</p></article>
+          <article><h3>위험 작업</h3><p>고온, 오염, 협소 공간처럼 사람이 직접 들어가기 어려운 환경에 적용합니다.</p></article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>LeRobot SO-101 Master-Slave Teleoperation System</p>
+      <a href="#top">맨 위로</a>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>

@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">Master-slave robotic arm teleoperation system</title>
+  <desc id="desc">Two robot arms on a lab bench connected by real-time motion data.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#10233a"/>
+      <stop offset="0.45" stop-color="#153a45"/>
+      <stop offset="1" stop-color="#27412f"/>
+    </linearGradient>
+    <linearGradient id="bench" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#eef3f4"/>
+      <stop offset="1" stop-color="#cdd9dc"/>
+    </linearGradient>
+    <linearGradient id="arm" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dbe4e6"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#061019" flood-opacity="0.28"/>
+    </filter>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1400" height="900" fill="url(#bg)"/>
+  <circle cx="1120" cy="170" r="250" fill="#48c9b0" opacity="0.11"/>
+  <circle cx="1010" cy="640" r="340" fill="#f5b94c" opacity="0.08"/>
+
+  <g opacity="0.55">
+    <path d="M75 190H545M75 250H485M75 310H350" stroke="#9edbd1" stroke-width="2"/>
+    <path d="M900 120h230M900 180h340M900 240h260" stroke="#f6d98e" stroke-width="2"/>
+    <circle cx="570" cy="190" r="7" fill="#9edbd1"/>
+    <circle cx="870" cy="180" r="7" fill="#f6d98e"/>
+  </g>
+
+  <path d="M145 722 C360 652, 970 652, 1260 720 L1350 810 L40 812 Z" fill="url(#bench)" filter="url(#softShadow)"/>
+  <path d="M70 805h1280v58H70z" fill="#92a7ad"/>
+
+  <g transform="translate(245 652)" filter="url(#softShadow)">
+    <ellipse cx="0" cy="45" rx="105" ry="32" fill="#20313a" opacity="0.18"/>
+    <rect x="-76" y="-7" width="152" height="70" rx="24" fill="#eff5f6"/>
+    <rect x="-48" y="-37" width="96" height="44" rx="16" fill="#cbd8dc"/>
+    <circle cx="0" cy="-50" r="54" fill="#f7fbfb" stroke="#bac9ce" stroke-width="12"/>
+    <circle cx="0" cy="-50" r="15" fill="#2bb7a4"/>
+    <g transform="rotate(-31)">
+      <rect x="4" y="-170" width="64" height="152" rx="30" fill="url(#arm)" stroke="#b8c8cd" stroke-width="8"/>
+      <circle cx="36" cy="-180" r="43" fill="#f7fbfb" stroke="#b8c8cd" stroke-width="10"/>
+    </g>
+    <g transform="translate(152 -248) rotate(28)">
+      <rect x="-34" y="-5" width="68" height="170" rx="31" fill="url(#arm)" stroke="#b8c8cd" stroke-width="8"/>
+      <circle cx="0" cy="174" r="31" fill="#f7fbfb" stroke="#b8c8cd" stroke-width="8"/>
+      <path d="M-28 202c-20 22-14 50 8 57M28 202c20 22 14 50-8 57" fill="none" stroke="#e7eff1" stroke-width="15" stroke-linecap="round"/>
+      <path d="M-28 202c-20 22-14 50 8 57M28 202c20 22 14 50-8 57" fill="none" stroke="#7d9299" stroke-width="7" stroke-linecap="round"/>
+    </g>
+    <text x="-82" y="105" fill="#17323b" font-family="Arial, sans-serif" font-size="34" font-weight="700">MASTER</text>
+  </g>
+
+  <g transform="translate(1068 652)" filter="url(#softShadow)">
+    <ellipse cx="0" cy="45" rx="105" ry="32" fill="#20313a" opacity="0.18"/>
+    <rect x="-76" y="-7" width="152" height="70" rx="24" fill="#eff5f6"/>
+    <rect x="-48" y="-37" width="96" height="44" rx="16" fill="#cbd8dc"/>
+    <circle cx="0" cy="-50" r="54" fill="#f7fbfb" stroke="#bac9ce" stroke-width="12"/>
+    <circle cx="0" cy="-50" r="15" fill="#f0a83a"/>
+    <g transform="rotate(-31)">
+      <rect x="4" y="-170" width="64" height="152" rx="30" fill="url(#arm)" stroke="#b8c8cd" stroke-width="8"/>
+      <circle cx="36" cy="-180" r="43" fill="#f7fbfb" stroke="#b8c8cd" stroke-width="10"/>
+    </g>
+    <g transform="translate(152 -248) rotate(28)">
+      <rect x="-34" y="-5" width="68" height="170" rx="31" fill="url(#arm)" stroke="#b8c8cd" stroke-width="8"/>
+      <circle cx="0" cy="174" r="31" fill="#f7fbfb" stroke="#b8c8cd" stroke-width="8"/>
+      <path d="M-28 202c-20 22-14 50 8 57M28 202c20 22 14 50-8 57" fill="none" stroke="#e7eff1" stroke-width="15" stroke-linecap="round"/>
+      <path d="M-28 202c-20 22-14 50 8 57M28 202c20 22 14 50-8 57" fill="none" stroke="#7d9299" stroke-width="7" stroke-linecap="round"/>
+    </g>
+    <text x="-60" y="105" fill="#17323b" font-family="Arial, sans-serif" font-size="34" font-weight="700">SLAVE</text>
+  </g>
+
+  <g transform="translate(472 260)" opacity="0.97">
+    <path d="M0 120 C112 -12, 334 -12, 446 120" fill="none" stroke="#7ee1d3" stroke-width="16" stroke-linecap="round" stroke-dasharray="18 32" filter="url(#glow)"/>
+    <path d="M400 108l57 16-23-55" fill="none" stroke="#7ee1d3" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="132" y="62" width="190" height="88" rx="24" fill="#0e232c" stroke="#7ee1d3" stroke-width="3"/>
+    <text x="160" y="99" fill="#dffdfa" font-family="Arial, sans-serif" font-size="23" font-weight="700">REAL-TIME</text>
+    <text x="161" y="128" fill="#aee8e1" font-family="Arial, sans-serif" font-size="19">joint data</text>
+  </g>
+
+  <g transform="translate(365 435)" filter="url(#softShadow)">
+    <path d="M-65 18c33-24 62-34 101-17 30 13 56 36 92 28 23-5 34 10 25 27-16 32-75 34-122 21-48-14-76-25-106-10-28 14-45-31 10-49z" fill="#e6b084"/>
+    <circle cx="166" cy="65" r="26" fill="#2bb7a4"/>
+  </g>
+
+  <g transform="translate(945 628)" filter="url(#softShadow)">
+    <rect x="-28" y="-28" width="56" height="56" rx="10" fill="#f0a83a"/>
+    <path d="M-18 -8h36M-18 9h36" stroke="#775312" stroke-width="5" stroke-linecap="round" opacity="0.35"/>
+  </g>
+</svg>
