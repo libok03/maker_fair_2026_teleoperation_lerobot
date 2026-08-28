@@ -1,0 +1,9 @@
+repositories:
+  gz_ros2_control:
+    type: git
+    url: https://github.com/ros-controls/gz_ros2_control.git
+    version: 522ca0e0d3560dc8c52628e9f52b86db78673920
+  stomp_moveit:
+    type: git
+    url: https://github.com/moveit/stomp_moveit.git
+    version: 5967adffd414cc340888f2f530bd1c9d29c3709c

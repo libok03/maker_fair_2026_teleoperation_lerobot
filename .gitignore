@@ -1,0 +1,17 @@
+# ROS 2 / colcon generated files
+**/build/
+**/install/
+**/log/
+
+# Python
+**/__pycache__/
+*.py[cod]
+
+# Editors and local tools
+.vscode/
+.idea/
+*.swp
+
+# Gazebo / ROS runtime data
+.gazebo/
+.ros/

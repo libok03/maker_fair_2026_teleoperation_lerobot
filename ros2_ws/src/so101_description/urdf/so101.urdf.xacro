@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="so101">
+  <xacro:arg name="hardware_type" default="mock"/>
+  <xacro:arg name="controllers_file" default=""/>
+  <xacro:arg name="prefix" default=""/>
+
+  <xacro:property name="hardware_type_value" value="$(arg hardware_type)"/>
+  <xacro:property name="controllers_file_value" value="$(arg controllers_file)"/>
+
+  <!-- CAD-derived model from TheRobotStudio/SO-ARM100, new midpoint calibration. -->
+  <xacro:include filename="$(find so101_description)/urdf/so101_model.urdf.xacro"/>
+
+  <!-- A world root keeps the tabletop arm anchored in RViz and Gazebo. -->
+  <link name="world"/>
+  <joint name="world_to_base" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:macro name="position_controlled_joint" params="name lower upper initial:=0.0">
+    <joint name="${name}">
+      <command_interface name="position">
+        <param name="min">${lower}</param>
+        <param name="max">${upper}</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">${initial}</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+
+  <ros2_control name="SO101System" type="system">
+    <hardware>
+      <xacro:if value="${hardware_type_value == 'gazebo'}">
+        <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+      </xacro:if>
+      <xacro:unless value="${hardware_type_value == 'gazebo'}">
+        <plugin>mock_components/GenericSystem</plugin>
+        <param name="calculate_dynamics">true</param>
+      </xacro:unless>
+    </hardware>
+
+    <xacro:position_controlled_joint name="shoulder_pan" lower="-1.91986" upper="1.91986"/>
+    <xacro:position_controlled_joint name="shoulder_lift" lower="-1.74533" upper="1.74533"/>
+    <xacro:position_controlled_joint name="elbow_flex" lower="-1.69" upper="1.69"/>
+    <xacro:position_controlled_joint name="wrist_flex" lower="-1.65806" upper="1.65806"/>
+    <xacro:position_controlled_joint name="wrist_roll" lower="-2.74385" upper="2.84121"/>
+    <xacro:position_controlled_joint name="gripper" lower="-0.174533" upper="1.74533"/>
+  </ros2_control>
+
+  <xacro:if value="${hardware_type_value == 'gazebo'}">
+    <gazebo>
+      <plugin filename="gz_ros2_control-system"
+              name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <parameters>${controllers_file_value}</parameters>
+      </plugin>
+    </gazebo>
+  </xacro:if>
+</robot>
