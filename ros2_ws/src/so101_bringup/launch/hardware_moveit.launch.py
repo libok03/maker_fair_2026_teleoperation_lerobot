@@ -22,6 +22,8 @@ def generate_launch_description():
         package="so101_bringup",
         executable="so101_follower_driver.py",
         output="screen",
+        respawn=True,
+        respawn_delay=2.0,
         parameters=[
             {
                 "port": port,

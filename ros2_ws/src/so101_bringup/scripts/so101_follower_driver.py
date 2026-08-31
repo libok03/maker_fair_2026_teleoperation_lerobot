@@ -212,6 +212,12 @@ class SO101FollowerDriver(Node):
             for name, motor_id in MOTOR_IDS.items():
                 model, result, error = self.packet.ping(self.port, motor_id)
                 if result != scs.COMM_SUCCESS:
+                    if name == "gripper":
+                        self.get_logger().warning(
+                            "Ping " + name + " failed (voltage?): " + self.packet.getTxRxResult(result)
+                            + " — gripper will be skipped"
+                        )
+                        continue
                     raise RuntimeError("Ping " + name + ": " + self.packet.getTxRxResult(result))
                 if error:
                     self.get_logger().warning(
