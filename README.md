@@ -13,6 +13,8 @@ GitHub Pages와 함께, ROS 2 Humble에서 SO-101을 시뮬레이션하고 모�
 - MoveIt 2 및 위치 우선 KDL IK
 - OMPL / Pilz / STOMP planning pipeline
 - Gazebo + MoveIt + RViz 통합 launch
+- 캘리브레이션된 실제 SO-101 follower용 MoveIt trajectory driver
+- 모터 ID 설정, 캘리브레이션, 단일 관절 동작 확인용 경량 도구
 
 ## 저장소 구조
 
@@ -21,6 +23,7 @@ GitHub Pages와 함께, ROS 2 Humble에서 SO-101을 시뮬레이션하고 모�
 ├── index.html, styles.css, script.js  # 프로젝트 소개 웹사이트
 ├── assets/                            # 웹사이트 이미지
 ├── calibration/                       # 장치별 LeRobot 캘리브레이션 백업
+├── tools/                             # ID/캘리브레이션/안전 동작 확인 도구
 └── ros2_ws/                           # SO-101 ROS 2 워크스페이스
     ├── src/
     │   ├── so101_description/
@@ -53,5 +56,5 @@ ros2 launch so101_bringup sim_moveit.launch.py
 리더암 캘리브레이션 백업과 복원 방법은
 [`calibration/README.md`](calibration/README.md)에 있습니다.
 
-> 현재 `mock`과 Gazebo용 `ros2_control` 구성을 제공합니다. 실제 STS3215 서보를
-> 구동하려면 calibration 및 단위 변환을 포함한 별도 hardware interface가 필요합니다.
+실제 follower는 `hardware_moveit.launch.py`로 연결합니다. 최초 실행 시에는 토크를
+끄고 상태만 확인한 다음, 안전 공간을 확보하고 `enable_torque:=true`를 명시합니다.

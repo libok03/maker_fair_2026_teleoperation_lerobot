@@ -132,6 +132,26 @@ ros2 launch so101_moveit_config demo.launch.py
 ros2 launch so101_bringup sim_moveit.launch.py
 ```
 
+### 실제 팔로워 + MoveIt + RViz
+
+먼저 캘리브레이션 JSON을 복원하고 `~/lerobot_hf/.venv-calib`에 설치된 순수 Python
+Feetech SDK를 사용합니다. 토크 없이 ID, 캘리브레이션 및 RViz 상태 반영을 확인합니다.
+
+```bash
+ros2 launch so101_bringup hardware_moveit.launch.py
+```
+
+실제 실행 전 팔을 받치고 작업 공간과 비상 전원 차단 수단을 확보한 뒤 실행합니다.
+
+```bash
+ros2 launch so101_bringup hardware_moveit.launch.py enable_torque:=true
+```
+
+드라이버는 `/arm_controller/follow_joint_trajectory`와
+`/gripper_controller/follow_joint_trajectory`를 받아 캘리브레이션된 STS3215 raw 값으로
+변환하고, 실제 위치를 `/joint_states`로 RViz에 되돌려 보냅니다. 시작할 때 JSON과
+모터 내부 offset/range가 다르면 토크를 켜지 않고 종료합니다.
+
 RViz MotionPlanning 패널의 `Planning Library`에서 다음 파이프라인을 선택합니다.
 
 - `ompl`: 기본값. planner ID는 `RRTConnectkConfigDefault`, `RRTstarkConfigDefault`,
@@ -189,11 +209,10 @@ source install/setup.bash
 
 ## 실제 LeRobot 하드웨어 연동 시 주의
 
-현재 `ros2_control`의 `mock` 모드는 테스트용입니다. 실제 STS3215 버스는 별도
-`hardware_interface::SystemInterface` 플러그인으로 교체해야 합니다. 또한 upstream
-LeRobot의 gripper 명령은 `0`(닫힘)~`100`(열림)인데 URDF 관절은
-`-0.174533`~`1.74533 rad`이므로 하드웨어 플러그인에서 반드시 단위 변환과 각 로봇의
-calibration offset을 적용해야 합니다.
+실제 드라이버는 gripper의 LeRobot 범위와 URDF radian 범위를 변환하며, body joint는
+4095 tick/회전과 각 장치의 캘리브레이션 midpoint를 사용합니다. 현재 검증에서 follower
+2번 `shoulder_lift`가 `Overload error` 상태를 보고했으므로, 전원을 껐다 켜고 관절의
+물리적 걸림과 배선을 확인한 뒤 토크를 활성화해야 합니다.
 
 ## 출처 및 호환성
 
