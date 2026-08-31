@@ -6,7 +6,7 @@ request_adapters: >-
   default_planner_request_adapters/FixStartStateBounds
   default_planner_request_adapters/FixStartStateCollision
   default_planner_request_adapters/FixStartStatePathConstraints
-start_state_max_bounds_error: 0.1
+start_state_max_bounds_error: 1.0
 planner_configs:
   RRTConnectkConfigDefault:
     type: geometric::RRTConnect
