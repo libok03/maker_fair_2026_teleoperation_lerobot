@@ -20,6 +20,7 @@ GitHub Pages와 함께, ROS 2 Humble에서 SO-101을 시뮬레이션하고 모�
 .
 ├── index.html, styles.css, script.js  # 프로젝트 소개 웹사이트
 ├── assets/                            # 웹사이트 이미지
+├── calibration/                       # 장치별 LeRobot 캘리브레이션 백업
 └── ros2_ws/                           # SO-101 ROS 2 워크스페이스
     ├── src/
     │   ├── so101_description/
@@ -48,6 +49,9 @@ ros2 launch so101_bringup sim_moveit.launch.py
 ```
 
 검증 환경은 Ubuntu 22.04, ROS 2 Humble, Gazebo Harmonic 8.15입니다.
+
+리더암 캘리브레이션 백업과 복원 방법은
+[`calibration/README.md`](calibration/README.md)에 있습니다.
 
 > 현재 `mock`과 Gazebo용 `ros2_control` 구성을 제공합니다. 실제 STS3215 서보를
 > 구동하려면 calibration 및 단위 변환을 포함한 별도 hardware interface가 필요합니다.
