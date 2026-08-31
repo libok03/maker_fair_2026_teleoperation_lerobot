@@ -152,6 +152,12 @@ ros2 launch so101_bringup hardware_moveit.launch.py enable_torque:=true
 변환하고, 실제 위치를 `/joint_states`로 RViz에 되돌려 보냅니다. 시작할 때 JSON과
 모터 내부 offset/range가 다르면 토크를 켜지 않고 종료합니다.
 
+통신이 연속으로 실패하면 기본값 `auto_recover:=true`가 포트를 다시 열고 6개 모터,
+캘리브레이션 및 안정된 전압을 확인한 뒤 현재 자세를 먼저 시드합니다. 최초 launch에서
+`enable_torque:=true`였을 때만 토크도 복원합니다. 다른 진단/캘리브레이션 프로그램과
+ROS 드라이버를 동시에 실행하면 같은 직렬 포트의 패킷이 충돌하므로 반드시 launch를
+먼저 종료합니다.
+
 RViz MotionPlanning 패널의 `Planning Library`에서 다음 파이프라인을 선택합니다.
 
 - `ompl`: 기본값. planner ID는 `RRTConnectkConfigDefault`, `RRTstarkConfigDefault`,

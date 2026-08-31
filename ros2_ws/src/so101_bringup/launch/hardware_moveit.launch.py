@@ -11,6 +11,7 @@ def generate_launch_description():
     port = LaunchConfiguration("port")
     calibration_file = LaunchConfiguration("calibration_file")
     enable_torque = LaunchConfiguration("enable_torque")
+    auto_recover = LaunchConfiguration("auto_recover")
     description_file = PathJoinSubstitution(
         [FindPackageShare("so101_description"), "urdf", "so101.urdf.xacro"]
     )
@@ -27,6 +28,7 @@ def generate_launch_description():
                 "port": port,
                 "calibration_file": calibration_file,
                 "enable_torque": ParameterValue(enable_torque, value_type=bool),
+                "auto_recover": ParameterValue(auto_recover, value_type=bool),
             }
         ],
     )
@@ -75,6 +77,7 @@ def generate_launch_description():
                 ),
             ),
             DeclareLaunchArgument("enable_torque", default_value="false"),
+            DeclareLaunchArgument("auto_recover", default_value="true"),
             robot_state_publisher,
             driver,
             move_group,

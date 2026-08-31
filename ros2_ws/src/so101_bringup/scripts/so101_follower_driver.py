@@ -65,12 +65,16 @@ DEFAULT_CALIBRATION = str(
 )
 ADDR_MIN_POSITION = 9
 ADDR_MAX_POSITION = 11
+ADDR_MAX_VOLTAGE_LIMIT = 14
+ADDR_MIN_VOLTAGE_LIMIT = 15
 ADDR_HOMING_OFFSET = 31
 ADDR_OPERATING_MODE = 33
 ADDR_TORQUE_ENABLE = 40
 ADDR_GOAL_POSITION = 42
 ADDR_PRESENT_POSITION = 56
+ADDR_PRESENT_VOLTAGE = 62
 MODEL_NUMBER_STS3215 = 777
+ERRBIT_VOLTAGE = 1
 RESOLUTION = 4095.0
 
 
@@ -92,13 +96,24 @@ class SO101FollowerDriver(Node):
         self.declare_parameter("enable_torque", False)
         self.declare_parameter("baudrate", 1_000_000)
         self.declare_parameter("state_publish_rate", 25.0)
+        self.declare_parameter("auto_recover", True)
+        self.declare_parameter("recovery_error_threshold", 5)
 
         self.port_name = self.get_parameter("port").value
         calibration_file = Path(self.get_parameter("calibration_file").value).expanduser()
         self.enable_torque_on_start = bool(self.get_parameter("enable_torque").value)
+        self.auto_recover = bool(self.get_parameter("auto_recover").value)
+        self.recovery_error_threshold = max(
+            2, int(self.get_parameter("recovery_error_threshold").value)
+        )
         self.serial_lock = threading.RLock()
         self.active_lock = threading.Lock()
+        self.recovery_lock = threading.Lock()
         self.active_goal = False
+        self.recovering = False
+        self.consecutive_comm_errors = 0
+        self.voltage_alarm_seen = False
+        self.last_recovery_time = 0.0
         self.torque_enabled = False
         self.last_positions = {name: 0.0 for name in JOINT_NAMES}
         self.calibration = self._load_calibration(calibration_file)
@@ -126,8 +141,10 @@ class SO101FollowerDriver(Node):
             # arm may sit just outside MoveIt's narrower planning limits.
             self._write_raw_positions(raw_positions)
             if self.enable_torque_on_start:
+                self._check_voltages_stable()
                 self._set_position_mode()
                 self._enable_torque()
+                self.voltage_alarm_seen = False
                 self.get_logger().warning(
                     "REAL HARDWARE ENABLED: MoveIt Execute will move the SO-101 follower"
                 )
@@ -183,27 +200,74 @@ class SO101FollowerDriver(Node):
         if error:
             raise RuntimeError(operation + ": " + self.packet.getRxPacketError(error))
 
-    def _read2(self, motor_id, address, operation):
-        value, result, error = self.packet.read2ByteTxRx(self.port, motor_id, address)
-        if result != scs.COMM_SUCCESS:
-            raise RuntimeError(operation + ": " + self.packet.getTxRxResult(result))
-        # STS3215 returns valid register data together with latched alarm bits.
-        # Keep RViz state feedback alive, but expose the hardware warning. Writes
-        # remain strict so an alarm cannot be ignored when enabling/moving motors.
+    def _reset_sdk_port_state(self):
+        # The vendor SDK can leave this flag set after a corrupted/interleaved
+        # packet. Clearing it permits the next transaction to make progress.
+        self.port.is_using = False
+        try:
+            self.port.ser.reset_input_buffer()
+        except Exception:
+            pass
+
+    def _read_register(self, method, motor_id, address, operation):
+        last_result = None
+        for attempt in range(3):
+            value, result, error = method(self.port, motor_id, address)
+            if result == scs.COMM_SUCCESS:
+                return int(value), error
+            last_result = result
+            self._reset_sdk_port_state()
+            if attempt < 2:
+                time.sleep(0.01)
+        raise RuntimeError(operation + ": " + self.packet.getTxRxResult(last_result))
+
+    def _read1(self, motor_id, address, operation):
+        value, error = self._read_register(
+            self.packet.read1ByteTxRx, motor_id, address, operation
+        )
         if error:
+            if error & ERRBIT_VOLTAGE:
+                self.voltage_alarm_seen = True
             self.get_logger().warning(
                 operation + ": motor alarm: " + self.packet.getRxPacketError(error),
                 throttle_duration_sec=2.0,
             )
-        return int(value)
+        return value
 
-    def _write1(self, motor_id, address, value, operation, allow_alarm=False):
+    def _read2(self, motor_id, address, operation):
+        value, error = self._read_register(
+            self.packet.read2ByteTxRx, motor_id, address, operation
+        )
+        # STS3215 returns valid register data together with latched alarm bits.
+        # Keep RViz state feedback alive, but expose the hardware warning. Writes
+        # remain strict so an alarm cannot be ignored when enabling/moving motors.
+        if error:
+            if error & ERRBIT_VOLTAGE:
+                self.voltage_alarm_seen = True
+            self.get_logger().warning(
+                operation + ": motor alarm: " + self.packet.getRxPacketError(error),
+                throttle_duration_sec=2.0,
+            )
+        return value
+
+    def _write1(
+        self,
+        motor_id,
+        address,
+        value,
+        operation,
+        allow_alarm=False,
+        allow_voltage_alarm=False,
+    ):
         result, error = self.packet.write1ByteTxRx(self.port, motor_id, address, int(value))
         if result != scs.COMM_SUCCESS:
             raise RuntimeError(operation + ": " + self.packet.getTxRxResult(result))
         if error:
+            if error & ERRBIT_VOLTAGE:
+                self.voltage_alarm_seen = True
             message = operation + ": motor alarm: " + self.packet.getRxPacketError(error)
-            if not allow_alarm:
+            voltage_only = error & ~ERRBIT_VOLTAGE == 0
+            if not allow_alarm and not (allow_voltage_alarm and voltage_only):
                 raise RuntimeError(message)
             self.get_logger().warning(message, throttle_duration_sec=2.0)
 
@@ -243,15 +307,57 @@ class SO101FollowerDriver(Node):
                 "Calibration JSON does not match motor memory: " + ", ".join(mismatches)
             )
 
+    def _read_voltages(self):
+        voltages = {}
+        with self.serial_lock:
+            for name, motor_id in MOTOR_IDS.items():
+                present = self._read1(motor_id, ADDR_PRESENT_VOLTAGE, "Read voltage " + name)
+                minimum = self._read1(
+                    motor_id, ADDR_MIN_VOLTAGE_LIMIT, "Read minimum voltage " + name
+                )
+                maximum = self._read1(
+                    motor_id, ADDR_MAX_VOLTAGE_LIMIT, "Read maximum voltage " + name
+                )
+                voltages[name] = (present, minimum, maximum)
+        return voltages
+
+    def _check_voltages_stable(self, cycles=3):
+        for cycle in range(cycles):
+            unsafe = []
+            for name, (present, minimum, maximum) in self._read_voltages().items():
+                # Registers use 0.1 V units. Keep 0.2 V away from configured
+                # protection edges before automatically restoring torque.
+                if present < minimum + 2 or present > maximum - 2:
+                    unsafe.append(
+                        "%s %.1fV (safe %.1f..%.1fV)"
+                        % (name, present / 10.0, (minimum + 2) / 10.0, (maximum - 2) / 10.0)
+                    )
+            if unsafe:
+                raise RuntimeError("Voltage is not safe: " + ", ".join(unsafe))
+            if cycle + 1 < cycles:
+                time.sleep(0.25)
+
     def _set_position_mode(self):
         with self.serial_lock:
             for name, motor_id in MOTOR_IDS.items():
-                self._write1(motor_id, ADDR_OPERATING_MODE, 0, "Set position mode " + name)
+                self._write1(
+                    motor_id,
+                    ADDR_OPERATING_MODE,
+                    0,
+                    "Set position mode " + name,
+                    allow_voltage_alarm=True,
+                )
 
     def _enable_torque(self):
         with self.serial_lock:
             for name, motor_id in MOTOR_IDS.items():
-                self._write1(motor_id, ADDR_TORQUE_ENABLE, 1, "Enable torque " + name)
+                self._write1(
+                    motor_id,
+                    ADDR_TORQUE_ENABLE,
+                    1,
+                    "Enable torque " + name,
+                    allow_voltage_alarm=True,
+                )
         self.torque_enabled = True
 
     def _disable_torque(self):
@@ -330,16 +436,89 @@ class SO101FollowerDriver(Node):
         try:
             positions = self._read_positions()
             self.last_positions = positions
+            self.consecutive_comm_errors = 0
         except Exception as exc:
+            self.consecutive_comm_errors += 1
             self.get_logger().error("Joint-state read failed: " + str(exc), throttle_duration_sec=2.0)
             positions = self.last_positions
+            if (
+                self.auto_recover
+                and self.consecutive_comm_errors >= self.recovery_error_threshold
+            ):
+                self._attempt_recovery(reopen_serial=True)
+        if (
+            self.auto_recover
+            and self.enable_torque_on_start
+            and self.voltage_alarm_seen
+            and time.monotonic() - self.last_recovery_time >= 2.0
+        ):
+            self._attempt_recovery(reopen_serial=False)
         message = JointState()
         message.header.stamp = self.get_clock().now().to_msg()
         message.name = JOINT_NAMES
         message.position = [positions[name] for name in JOINT_NAMES]
         self.joint_state_publisher.publish(message)
 
+    def _attempt_recovery(self, reopen_serial):
+        if not self.recovery_lock.acquire(blocking=False):
+            return
+        self.recovering = True
+        self.last_recovery_time = time.monotonic()
+        try:
+            with self.active_lock:
+                if self.active_goal:
+                    return
+            reason = "communication loss" if reopen_serial else "motor voltage alarm"
+            self.get_logger().warning(reason + "; starting safe auto-recovery")
+            if reopen_serial:
+                with self.serial_lock:
+                    try:
+                        if self.port.is_open:
+                            self.port.closePort()
+                    except Exception:
+                        pass
+                    self.port.is_using = False
+                    time.sleep(0.25)
+                    if not self.port.openPort():
+                        raise RuntimeError("Failed to reopen serial port")
+                    if not self.port.setBaudRate(int(self.get_parameter("baudrate").value)):
+                        raise RuntimeError("Failed to restore baud rate")
+
+            self._check_motors()
+            self._check_hardware_calibration()
+            self._disable_torque()
+            self._check_voltages_stable()
+            raw_positions = self._read_raw_positions()
+            self._write_raw_positions(raw_positions)
+            self.last_positions = {
+                name: self._raw_to_position(name, raw) for name, raw in raw_positions.items()
+            }
+            if self.enable_torque_on_start:
+                self._set_position_mode()
+                self._enable_torque()
+                self.voltage_alarm_seen = False
+                self.get_logger().warning(
+                    "Auto-recovery complete: voltage stable, current pose seeded, torque restored"
+                )
+            else:
+                self.get_logger().info("Auto-recovery complete; torque remains disabled")
+            self.consecutive_comm_errors = 0
+        except Exception as exc:
+            self.torque_enabled = False
+            self.get_logger().error(
+                "Auto-recovery failed; torque will not be restored: " + str(exc),
+                throttle_duration_sec=2.0,
+            )
+            # Retry from the state timer after another threshold interval.
+            self.consecutive_comm_errors = 0
+        finally:
+            self.recovering = False
+            self.recovery_lock.release()
+
     def _goal_callback(self, request, expected_joints):
+        if self.recovering:
+            self.get_logger().error("Rejecting trajectory while hardware is recovering")
+            return GoalResponse.REJECT
         if not self.torque_enabled:
             self.get_logger().error("Rejecting trajectory because torque is disabled")
             return GoalResponse.REJECT
@@ -411,6 +590,8 @@ class SO101FollowerDriver(Node):
             period = 0.02
 
             while rclpy.ok():
+                if self.voltage_alarm_seen:
+                    raise RuntimeError("Motor voltage alarm detected; aborting trajectory for recovery")
                 if goal_handle.is_cancel_requested:
                     current_raw = self._read_raw_positions()
                     self._write_raw_positions(
@@ -454,9 +635,10 @@ class SO101FollowerDriver(Node):
         if getattr(self, "port", None) is None:
             return
         try:
-            if self.torque_enabled:
-                self._disable_torque()
-                self.get_logger().info("Follower torque disabled")
+            # Always attempt this: after a communication drop the software may
+            # not know whether motor-side torque remained enabled.
+            self._disable_torque()
+            self.get_logger().info("Follower torque disabled")
         except Exception as exc:
             self.get_logger().error("Failed to disable follower torque: " + str(exc))
         finally:
