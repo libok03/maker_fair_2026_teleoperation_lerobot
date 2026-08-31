@@ -274,16 +274,18 @@ class SO101FollowerDriver(Node):
     def _check_motors(self):
         with self.serial_lock:
             for name, motor_id in MOTOR_IDS.items():
-                model, result, error = self.packet.ping(self.port, motor_id)
+                for attempt in range(3):
+                    model, result, error = self.packet.ping(self.port, motor_id)
+                    if result == scs.COMM_SUCCESS:
+                        break
+                    self._reset_sdk_port_state()
+                    if attempt < 2:
+                        time.sleep(0.02)
                 if result != scs.COMM_SUCCESS:
-                    if name == "gripper":
-                        self.get_logger().warning(
-                            "Ping " + name + " failed (voltage?): " + self.packet.getTxRxResult(result)
-                            + " — gripper will be skipped"
-                        )
-                        continue
                     raise RuntimeError("Ping " + name + ": " + self.packet.getTxRxResult(result))
                 if error:
+                    if error & ERRBIT_VOLTAGE:
+                        self.voltage_alarm_seen = True
                     self.get_logger().warning(
                         "Ping " + name + ": motor alarm: " + self.packet.getRxPacketError(error)
                     )
