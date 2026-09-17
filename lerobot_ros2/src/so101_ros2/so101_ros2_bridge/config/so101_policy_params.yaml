@@ -1,0 +1,16 @@
+# Shared parameters for all policy nodes
+# --------------------------------------
+/**:
+  ros__parameters:
+    # Sync / timing
+    inference_rate: 1.0          # Hz, how often to run policy
+    inference_delay: 0.5        # sec, delay of inference
+    publish_rate: 25.0           # Hz, how often to publish JointState commands
+    sync.queue_size: 20               # message_filters queue_size
+    sync.slop: 0.1                  # ApproximateTimeSynchronizer slop [sec]
+
+    # General policy parameters
+    policy_name: "smolvla"
+    device: cuda:0
+    checkpoint_path: "<your abs path to the ckpt dir>/pretrained_model"  # Default checkpoint path
+    task: "<your task description here>" # e.g "Pick the cube and place it in the bowl."
