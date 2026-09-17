@@ -1,0 +1,10 @@
+/follower/so101_follower_interface:
+  ros__parameters:
+    port: "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B91028413-if00"
+    id: "Tzili"
+    # calibration_dir: <abs path to your calibration dir>
+    use_degrees: true
+    max_relative_target: 10.0 # degrees per command cycle; 0.0 disables the limit
+    disable_torque_on_disconnect: false
+    publish_rate: 50.0
+    motor_write_rate: 25.0

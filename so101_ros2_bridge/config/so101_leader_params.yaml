@@ -1,0 +1,9 @@
+/leader/so101_leader_interface:
+  ros__parameters:
+    port: "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B91029896-if00"
+    id: "Gili"
+    # calibration_dir: <abs path to your calibration dir>
+    use_degrees: true
+    # max_relative_target: 10 # default is none
+    disable_torque_on_disconnect: true
+    publish_rate: 50.0
