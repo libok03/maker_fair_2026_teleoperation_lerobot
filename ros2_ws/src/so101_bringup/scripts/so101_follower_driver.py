@@ -50,6 +50,7 @@ JOINT_NAMES = [
 ARM_JOINTS = JOINT_NAMES[:5]
 GRIPPER_JOINTS = JOINT_NAMES[5:]
 MOTOR_IDS = {name: index + 1 for index, name in enumerate(JOINT_NAMES)}
+MOTOR_NAMES = {motor_id: name for name, motor_id in MOTOR_IDS.items()}
 URDF_LIMITS = {
     "shoulder_pan": (-1.91986, 1.91986),
     "shoulder_lift": (-1.74533, 1.74533),
@@ -109,10 +110,12 @@ class SO101FollowerDriver(Node):
         self.serial_lock = threading.RLock()
         self.active_lock = threading.Lock()
         self.recovery_lock = threading.Lock()
+        self.alarm_lock = threading.Lock()
         self.active_goal = False
         self.recovering = False
         self.consecutive_comm_errors = 0
         self.voltage_alarm_seen = False
+        self.voltage_alarm_sources = {}
         self.last_recovery_time = 0.0
         self.torque_enabled = False
         self.last_positions = {name: 0.0 for name in JOINT_NAMES}
@@ -144,7 +147,7 @@ class SO101FollowerDriver(Node):
                 self._check_voltages_stable()
                 self._set_position_mode()
                 self._enable_torque()
-                self.voltage_alarm_seen = False
+                self._clear_voltage_alarms()
                 self.get_logger().warning(
                     "REAL HARDWARE ENABLED: MoveIt Execute will move the SO-101 follower"
                 )
@@ -200,6 +203,27 @@ class SO101FollowerDriver(Node):
         if error:
             raise RuntimeError(operation + ": " + self.packet.getRxPacketError(error))
 
+    def _record_voltage_alarm(self, motor_id, operation):
+        name = MOTOR_NAMES.get(motor_id, "unknown_id_%s" % motor_id)
+        with self.alarm_lock:
+            self.voltage_alarm_seen = True
+            # Dict insertion order preserves the first motor/operation observed.
+            self.voltage_alarm_sources.setdefault(name, operation)
+
+    def _voltage_alarm_summary(self):
+        with self.alarm_lock:
+            if not self.voltage_alarm_sources:
+                return "source unknown"
+            return ", ".join(
+                "%s(id=%s, first_operation=%s)" % (name, MOTOR_IDS.get(name, "?"), operation)
+                for name, operation in self.voltage_alarm_sources.items()
+            )
+
+    def _clear_voltage_alarms(self):
+        with self.alarm_lock:
+            self.voltage_alarm_seen = False
+            self.voltage_alarm_sources.clear()
+
     def _reset_sdk_port_state(self):
         # The vendor SDK can leave this flag set after a corrupted/interleaved
         # packet. Clearing it permits the next transaction to make progress.
@@ -227,7 +251,7 @@ class SO101FollowerDriver(Node):
         )
         if error:
             if error & ERRBIT_VOLTAGE:
-                self.voltage_alarm_seen = True
+                self._record_voltage_alarm(motor_id, operation)
             self.get_logger().warning(
                 operation + ": motor alarm: " + self.packet.getRxPacketError(error),
                 throttle_duration_sec=2.0,
@@ -243,7 +267,7 @@ class SO101FollowerDriver(Node):
         # remain strict so an alarm cannot be ignored when enabling/moving motors.
         if error:
             if error & ERRBIT_VOLTAGE:
-                self.voltage_alarm_seen = True
+                self._record_voltage_alarm(motor_id, operation)
             self.get_logger().warning(
                 operation + ": motor alarm: " + self.packet.getRxPacketError(error),
                 throttle_duration_sec=2.0,
@@ -264,7 +288,7 @@ class SO101FollowerDriver(Node):
             raise RuntimeError(operation + ": " + self.packet.getTxRxResult(result))
         if error:
             if error & ERRBIT_VOLTAGE:
-                self.voltage_alarm_seen = True
+                self._record_voltage_alarm(motor_id, operation)
             message = operation + ": motor alarm: " + self.packet.getRxPacketError(error)
             voltage_only = error & ~ERRBIT_VOLTAGE == 0
             if not allow_alarm and not (allow_voltage_alarm and voltage_only):
@@ -285,7 +309,7 @@ class SO101FollowerDriver(Node):
                     raise RuntimeError("Ping " + name + ": " + self.packet.getTxRxResult(result))
                 if error:
                     if error & ERRBIT_VOLTAGE:
-                        self.voltage_alarm_seen = True
+                        self._record_voltage_alarm(motor_id, "Ping " + name)
                     self.get_logger().warning(
                         "Ping " + name + ": motor alarm: " + self.packet.getRxPacketError(error)
                     )
@@ -357,6 +381,9 @@ class SO101FollowerDriver(Node):
                 )
 
     def _enable_torque(self):
+        self.get_logger().warning(
+            "TORQUE ON requested for all follower motors (IDs 1-6)"
+        )
         with self.serial_lock:
             for name, motor_id in MOTOR_IDS.items():
                 self._write1(
@@ -367,8 +394,14 @@ class SO101FollowerDriver(Node):
                     allow_voltage_alarm=True,
                 )
         self.torque_enabled = True
+        self.get_logger().warning(
+            "TORQUE ON complete for all follower motors (Torque_Enable=1, IDs 1-6)"
+        )
 
     def _disable_torque(self):
+        self.get_logger().warning(
+            "TORQUE OFF requested for all follower motors (IDs 1-6)"
+        )
         errors = []
         with self.serial_lock:
             for name, motor_id in MOTOR_IDS.items():
@@ -385,6 +418,9 @@ class SO101FollowerDriver(Node):
         self.torque_enabled = False
         if errors:
             raise RuntimeError("; ".join(errors))
+        self.get_logger().warning(
+            "TORQUE OFF complete for all follower motors (Torque_Enable=0, IDs 1-6)"
+        )
 
     def _raw_to_position(self, name, raw):
         cal = self.calibration[name]
@@ -475,9 +511,18 @@ class SO101FollowerDriver(Node):
         try:
             with self.active_lock:
                 if self.active_goal:
+                    self.get_logger().warning(
+                        "Auto-recovery deferred until active trajectory is aborted; alarm sources: "
+                        + self._voltage_alarm_summary(),
+                        throttle_duration_sec=1.0,
+                    )
                     return
             reason = "communication loss" if reopen_serial else "motor voltage alarm"
-            self.get_logger().warning(reason + "; starting safe auto-recovery")
+            self.get_logger().warning(
+                reason
+                + "; starting safe auto-recovery; alarm sources: "
+                + self._voltage_alarm_summary()
+            )
             if reopen_serial:
                 with self.serial_lock:
                     try:
@@ -494,19 +539,24 @@ class SO101FollowerDriver(Node):
 
             self._check_motors()
             self._check_hardware_calibration()
+            self.get_logger().info("Recovery step: motor communication and calibration verified")
             self._disable_torque()
             self._check_voltages_stable()
+            self.get_logger().info("Recovery step: voltage stable")
             raw_positions = self._read_raw_positions()
             self._write_raw_positions(raw_positions)
+            self.get_logger().info("Recovery step: current pose seeded")
             self.last_positions = {
                 name: self._raw_to_position(name, raw) for name, raw in raw_positions.items()
             }
             if self.enable_torque_on_start:
                 self._set_position_mode()
                 self._enable_torque()
-                self.voltage_alarm_seen = False
+                recovered_sources = self._voltage_alarm_summary()
+                self._clear_voltage_alarms()
                 self.get_logger().warning(
-                    "Auto-recovery complete: voltage stable, current pose seeded, torque restored"
+                    "Auto-recovery complete: voltage stable, current pose seeded, torque restored; "
+                    "handled alarm sources: " + recovered_sources
                 )
             else:
                 self.get_logger().info("Auto-recovery complete; torque remains disabled")
@@ -599,7 +649,10 @@ class SO101FollowerDriver(Node):
 
             while rclpy.ok():
                 if self.voltage_alarm_seen:
-                    raise RuntimeError("Motor voltage alarm detected; aborting trajectory for recovery")
+                    raise RuntimeError(
+                        "Motor voltage alarm detected; aborting trajectory for recovery; sources: "
+                        + self._voltage_alarm_summary()
+                    )
                 if goal_handle.is_cancel_requested:
                     current_raw = self._read_raw_positions()
                     self._write_raw_positions(
