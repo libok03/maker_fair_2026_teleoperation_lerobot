@@ -12,12 +12,12 @@
     },
     "second_leader": {
       "role": "leader",
-      "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B8E114172-if00",
+      "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B8E113888-if00",
       "calibration_id": "Gili_2"
     },
     "second_follower": {
       "role": "follower",
-      "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B8E113888-if00",
+      "port": "/dev/serial/by-id/usb-1a86_USB_Single_Serial_5B8E114172-if00",
       "calibration_id": "Tzili_2"
     }
   }

@@ -3,7 +3,6 @@
 
 import glob
 import json
-import math
 import os
 import sys
 import threading
@@ -76,7 +75,6 @@ ADDR_PRESENT_POSITION = 56
 ADDR_PRESENT_VOLTAGE = 62
 MODEL_NUMBER_STS3215 = 777
 ERRBIT_VOLTAGE = 1
-RESOLUTION = 4095.0
 
 
 def duration_seconds(duration):
@@ -424,24 +422,25 @@ class SO101FollowerDriver(Node):
 
     def _raw_to_position(self, name, raw):
         cal = self.calibration[name]
-        if name == "gripper":
-            fraction = (raw - cal["range_min"]) / (cal["range_max"] - cal["range_min"])
-            lower, upper = URDF_LIMITS[name]
-            return lower + fraction * (upper - lower)
-        midpoint = (cal["range_min"] + cal["range_max"]) / 2.0
-        return (raw - midpoint) * 2.0 * math.pi / RESOLUTION
+        # Every SO-101 joint is finite.  Its recorded calibration endpoints
+        # define the physical motion range and must map directly to the URDF
+        # endpoints.  Using a fixed 2*pi/4095 scale can publish a value beyond
+        # MoveIt's limits when a motor's calibrated span is narrower than one
+        # encoder revolution (for example wrist_flex).
+        range_min = int(cal["range_min"])
+        range_max = int(cal["range_max"])
+        bounded_raw = max(range_min, min(range_max, int(raw)))
+        fraction = (bounded_raw - range_min) / (range_max - range_min)
+        lower, upper = URDF_LIMITS[name]
+        return lower + fraction * (upper - lower)
 
     def _position_to_raw(self, name, position):
         lower, upper = URDF_LIMITS[name]
         if not lower - 1e-6 <= position <= upper + 1e-6:
             raise ValueError("%s target %.4f is outside [%.4f, %.4f]" % (name, position, lower, upper))
         cal = self.calibration[name]
-        if name == "gripper":
-            fraction = (position - lower) / (upper - lower)
-            raw = cal["range_min"] + fraction * (cal["range_max"] - cal["range_min"])
-        else:
-            midpoint = (cal["range_min"] + cal["range_max"]) / 2.0
-            raw = midpoint + position * RESOLUTION / (2.0 * math.pi)
+        fraction = (position - lower) / (upper - lower)
+        raw = cal["range_min"] + fraction * (cal["range_max"] - cal["range_min"])
         raw = int(round(raw))
         return max(int(cal["range_min"]), min(int(cal["range_max"]), raw))
 
