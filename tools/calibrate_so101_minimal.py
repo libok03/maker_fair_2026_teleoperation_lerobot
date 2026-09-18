@@ -13,15 +13,16 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "src"))
+local_src = REPO_ROOT / "src"
+if local_src.exists():
+    sys.path.insert(0, str(local_src))
 
-# Importing lerobot.utils normally also imports ML-only device helpers and torch.
-# Expose the package path without running that unrelated __init__, while retaining
-# the unmodified motor, serial, decorator, and utility modules below it.
-utils_package = types.ModuleType("lerobot.utils")
-utils_package.__path__ = [str(REPO_ROOT / "src/lerobot/utils")]
-utils_package.__package__ = "lerobot.utils"
-sys.modules["lerobot.utils"] = utils_package
+    # Importing older local LeRobot trees can pull in optional ML dependencies.
+    # Expose only their utility package when that local source tree is present.
+    utils_package = types.ModuleType("lerobot.utils")
+    utils_package.__path__ = [str(local_src / "lerobot/utils")]
+    utils_package.__package__ = "lerobot.utils"
+    sys.modules["lerobot.utils"] = utils_package
 
 from lerobot.motors import Motor, MotorCalibration, MotorNormMode  # noqa: E402
 from lerobot.motors.feetech import FeetechMotorsBus, OperatingMode  # noqa: E402
@@ -32,6 +33,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", required=True, help="Serial port or /dev/serial/by-id path")
     parser.add_argument("--role", choices=("leader", "follower"), default="leader")
     parser.add_argument("--id", default=None, help="Calibration file identifier")
+    parser.add_argument(
+        "--joint",
+        choices=(
+            "shoulder_pan",
+            "shoulder_lift",
+            "elbow_flex",
+            "wrist_flex",
+            "wrist_roll",
+            "gripper",
+        ),
+        default=None,
+        help="Calibrate only this joint while preserving every other saved joint.",
+    )
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -55,10 +69,13 @@ def make_bus(port: str) -> FeetechMotorsBus:
     )
 
 
-def set_wrapped_half_turn_homings(bus: FeetechMotorsBus) -> dict[str, int]:
+def set_wrapped_half_turn_homings(
+    bus: FeetechMotorsBus, motors: list[str] | None = None
+) -> dict[str, int]:
     """Set half-turn homings while handling encoder wraparound safely."""
-    bus.reset_calibration()
-    positions = bus.sync_read("Present_Position", normalize=False, num_retry=5)
+    motor_names = list(bus.motors) if motors is None else motors
+    bus.reset_calibration(motor_names)
+    positions = bus.sync_read("Present_Position", motor_names, normalize=False, num_retry=5)
     offsets: dict[str, int] = {}
 
     print("\nHoming values:")
@@ -95,10 +112,18 @@ def main() -> None:
             if args.role == "leader"
             else calibration_root / "robots/so_follower"
         )
-    if not os.path.exists(args.port):
+    output_path = output_dir / f"{device_id}.json"
+    if os.name != "nt" and not os.path.exists(args.port):
         raise SystemExit(f"Port does not exist: {args.port}")
-    if not os.access(args.port, os.R_OK | os.W_OK):
+    if os.name != "nt" and not os.access(args.port, os.R_OK | os.W_OK):
         raise SystemExit(f"No read/write permission for port: {args.port}")
+
+    saved_calibration = None
+    if args.joint:
+        if not output_path.exists():
+            raise SystemExit(f"Existing calibration file not found: {output_path}")
+        with output_path.open("r", encoding="utf-8") as input_file:
+            saved_calibration = json.load(input_file)
 
     bus = make_bus(args.port)
     handshake_succeeded = False
@@ -106,10 +131,39 @@ def main() -> None:
         print("Connecting and checking STS3215 motor IDs 1-6...")
         bus.connect()
         handshake_succeeded = True
-        bus.disable_torque()
-        bus.configure_motors()
-        for motor in bus.motors:
+        selected_motors = [args.joint] if args.joint else list(bus.motors)
+        bus.disable_torque(selected_motors)
+        for motor in selected_motors:
             bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
+
+        if args.joint:
+            input(
+                f"\nMove {args.joint} near the middle of its safe range, "
+                "then press ENTER..."
+            )
+            homing_offsets = set_wrapped_half_turn_homings(bus, selected_motors)
+            print(
+                f"\nSlowly move {args.joint} through its full SAFE range. "
+                "Do not force a mechanical stop. Press ENTER when finished."
+            )
+            range_mins, range_maxes = bus.record_ranges_of_motion(selected_motors)
+            joint_calibration = MotorCalibration(
+                id=bus.motors[args.joint].id,
+                drive_mode=int(saved_calibration[args.joint]["drive_mode"]),
+                homing_offset=int(homing_offsets[args.joint]),
+                range_min=int(range_mins[args.joint]),
+                range_max=int(range_maxes[args.joint]),
+            )
+            bus.write_calibration({args.joint: joint_calibration}, cache=False)
+            saved_calibration[args.joint] = asdict(joint_calibration)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            with output_path.open("w", encoding="utf-8") as output_file:
+                json.dump(saved_calibration, output_file, indent=4)
+                output_file.write("\n")
+            print(f"\n{args.joint} calibration saved to {output_path}")
+            return
+
+        bus.configure_motors()
 
         input(
             "\nMove every joint near the middle of its range. "
@@ -141,7 +195,6 @@ def main() -> None:
         bus.write_calibration(calibration)
 
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"{device_id}.json"
         with output_path.open("w", encoding="utf-8") as output_file:
             json.dump(
                 {name: asdict(values) for name, values in calibration.items()},

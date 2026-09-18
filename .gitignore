@@ -6,6 +6,7 @@
 # Python
 **/__pycache__/
 *.py[cod]
+.venv*/
 
 # Editors and local tools
 .vscode/
